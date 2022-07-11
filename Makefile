@@ -9,7 +9,7 @@ build:
 	sudo docker build -t bot-container-${USER_NAME}:dev .
 
 run:
-	sudo docker run -it --rm -d \
+	sudo docker run -it --rm \
 	    --env-file ${CURRENT_DIR}/.env \
 	    -e TG_PHONE=${PHONE} \
 	    -e APP_API_ID=${API_ID} \
