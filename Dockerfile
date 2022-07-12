@@ -25,6 +25,6 @@ RUN \
     apt-get update && python3.8 -m pip install --upgrade pip && \
     python3.8 -m pip install --no-cache -r requirements.txt
 
-USER ${REMOTE_USER}
+USER ${PROJECT_NAME}
 
 CMD ["python3.8", "src/main.py"]
