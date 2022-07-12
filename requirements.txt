@@ -1,3 +1,2 @@
-pytest
-requests
 telethon
+demoji==1.1.0
