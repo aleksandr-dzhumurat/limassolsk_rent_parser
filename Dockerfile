@@ -1,30 +1,19 @@
-FROM python:3.8-slim-buster
+FROM python:3.10
 
-ARG PROJECT_NAME=tg_bot
-ARG GROUP_ID=5000
-ARG USER_ID=5000
-
-ENV PYTHONPATH=/srv/${PROJECT_NAME} \
-    # Keeps Python from generating .pyc files in the container
+ENV PYTHONPATH=/srv \
     PYTHONDONTWRITEBYTECODE=1 \
-    # Turns off buffering for easier container logging
     PYTHONUNBUFFERED=1
 
-RUN groupadd --gid ${GROUP_ID} ${PROJECT_NAME} && \
-    useradd --home-dir /home/${PROJECT_NAME} --create-home --uid ${USER_ID} \
-        --gid ${GROUP_ID} --shell /bin/sh --skel /dev/null ${PROJECT_NAME} && \
-    mkdir /srv/${PROJECT_NAME} && \
-    chown -R ${PROJECT_NAME}:${PROJECT_NAME} /srv/${PROJECT_NAME}
+WORKDIR /srv/
 
-WORKDIR /srv/${PROJECT_NAME}
-
-COPY requirements.txt /srv/${PROJECT_NAME}
-COPY src/ /srv/${PROJECT_NAME}/src/
+COPY requirements.txt /srv/
+RUN python3.10 -m pip install --upgrade pip
 
 RUN \
-    apt-get update && python3.8 -m pip install --upgrade pip && \
-    python3.8 -m pip install --no-cache -r requirements.txt
+    python3.10 -m pip install --no-cache -r requirements.txt
 
-USER ${PROJECT_NAME}
+COPY src/ /srv/src/
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-CMD ["python3.8", "src/main.py"]
+ENTRYPOINT ["docker-entrypoint.sh"]
