@@ -1,0 +1,6 @@
+.env
+data/messages.db
+data/tg_collector.log
+data/labeled_data_corpus.csv
+data/model.pkl
+data/vectorizer.pkl

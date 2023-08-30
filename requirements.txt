@@ -1,2 +1,8 @@
+requests
 telethon
 demoji==1.1.0
+scikit-learn
+pymorphy2
+nltk==3.6.2
+pandas
+PyYAML==6.0

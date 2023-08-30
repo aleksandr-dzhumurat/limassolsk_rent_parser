@@ -5,7 +5,7 @@ import logging
 import time
 from collections import defaultdict
 
-
+import yaml
 import demoji
 
 
@@ -19,11 +19,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def prepare_dirs(root_dir: str):
+    if not os.path.exists(root_dir):
+        os.mkdir(root_dir)
+
 def def_value():
     return None
 
+if os.getenv("CONFIG_PATH") is None:
+    config_path = "config.yml"
+else:
+    config_path = os.environ["CONFIG_PATH"]
+
+with open(config_path, "r") as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+
 class Config:
-    def __init__(self):
+    def __init__(self, yml_conf):
         self.SESSION_NAME = str(hash(time.time()))
         self.APP_API_ID = os.environ['APP_API_ID']
         self.APP_API_HASH = os.environ['APP_API_HASH']
@@ -36,19 +49,24 @@ class Config:
         self.db_file = os.path.join(self.data_dir, 'messages.db')
         self.tg_sources_file = os.path.join(self.data_dir, 'channel_list.tsv')
         self.sink_table = 'tg_messages'
+        # ML data & params
+        self.raw_data_file = os.path.join(yml_conf["data_dir"], "labeled_data_corpus.csv")
+        self.model_path = os.path.join(yml_conf["data_dir"], yml_conf["model_file_name"])
+        self.tf_idf_params = yml_conf["tf_idf_params"]
+        self.vectorizer_path = os.path.join(yml_conf["data_dir"], yml_conf["vectorizer_file_name"])
 
-conf = Config()
+    def read_channel_list(self) -> set:
+        res = set()
+        with open(self.tg_sources_file, 'r') as f:
+            for row in f.readlines():
+                if len(row.strip()) > 0:
+                    res.add(row.strip())
+        return res
 
-def read_channel_list() -> set:
-    res = set()
-    with open(conf.tg_sources_file, 'r') as f:
-        for row in f.readlines():
-            if len(row.strip()) > 0:
-                res.add(row.strip())
-    return res
+conf = Config(config)
 
 class TgMessage:
-    def __init__(self, msg_id, msg_text, msg_channel):
+    def __init__(self, msg_id: str, msg_text: str, msg_channel: str, msg_author: str):
         self.id = msg_id
         if msg_text is not None:
             self.txt = demoji.replace(msg_text.replace('\n', ' ').lower().replace("'","_"))
@@ -57,12 +75,18 @@ class TgMessage:
         self.channel = msg_channel
         self.link = f'https://t.me/{self.channel}/{self.id}'
         self.msg_hash = hashlib.md5(self.txt.encode('utf-8')).hexdigest()
+        if msg_author is None:
+            self.author = ''
+        else:
+            self.author = msg_author.lower()
     
     def check_text(self) -> bool:
         res = True
         if len(self.txt) <= 50:
             res = False
-        stop_words = ('looking', 'larnaca', 'sale', 'сдан', 'office', 'офис','прода', 'айя', 'пафос', 'никоси', 'banned', 'сним', 'ищет', 'ищу', 'ищем', 'уборк', 'ларнака', 'интересует', 'рассмотрю')
+        if 'реклам' in self.author:
+            res = False
+        stop_words = ('looking', 'larnaca', 'sale', 'сдан', 'office', 'офис','прода', 'айя', 'пафос', 'никоси', 'banned', 'сним', 'ищет', 'ищу', 'ищем', 'уборк', 'ларнака', 'интересует', 'рассмотрю', 'реклам', 'бот', 'зарабатывать')
         for word in stop_words:
             if word in self.txt:
                 res = False
@@ -100,7 +124,7 @@ class MessagesDB(DataBase):
             max_id = res[0][0]
         return max_id
     
-    def add_message(self, msg: TgMessage):
+    def add_message(self, msg: TgMessage, msg_score=1):
         # sql_str = f"""INSERT INTO  {self.conf.sink_table} VALUES  ({msg.id}, '{msg.txt}', '{msg.channel}')"""
         sql_str = f"""INSERT INTO  {self.conf.sink_table} VALUES  ({msg.id}, '{msg.txt}', '{msg.channel}', '{msg.msg_hash}')"""
         self.run_sql(sql_str)
@@ -115,11 +139,15 @@ class MessagesDB(DataBase):
     def loaded_messages(self) -> set:
         res = set()
         sql_res = self.run_sql(f"""SELECT msg_hash FROM {self.conf.sink_table}""")
-        if len(res) > 1:
+        if len(sql_res) > 1:
             for i in sql_res:
-                res.add(i)
+                res.add(i[0])
         logger.info('Total messages in DB: %d', len(res))
         return res
 
 
 channel_min_msg = defaultdict(def_value)
+
+db = MessagesDB(conf)
+db.init_db()
+logger.info('database created')

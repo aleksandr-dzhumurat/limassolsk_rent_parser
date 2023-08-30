@@ -7,5 +7,5 @@ make build
 # Start service
 
 ```shell
-PHONE=+17443065674 make run
+DEBUG=false make run
 ```
